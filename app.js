@@ -254,7 +254,7 @@ function calculateComponentStatus(motor, componentName) {
 function calculateMotorHealth(motor) {
     if (!motor) return { healthPct: 0, status: "none", message: "Tidak ada data", totalDanger: 0 };
 
-    const components = getComponentsForType(motor.type);
+    const components = Object.keys(motor.intervals);
     let totalPct = 0;
     let count = 0;
     let totalDanger = 0;
@@ -391,7 +391,7 @@ function renderDashboard() {
     const partsGrid = document.getElementById('parts-status-grid');
     partsGrid.innerHTML = "";
 
-    const activeComponents = getComponentsForType(activeMotor.type);
+    const activeComponents = Object.keys(activeMotor.intervals);
     
     activeComponents.forEach(compName => {
         const stats = calculateComponentStatus(activeMotor, compName);
@@ -670,11 +670,14 @@ function renderSettings() {
 
     settingsMotorTag.textContent = `Motor Aktif: ${activeMotor.name} (${activeMotor.plate || 'Tanpa Plat'})`;
 
-    const components = getComponentsForType(activeMotor.type);
+    const standardComponents = getComponentsForType(activeMotor.type);
+    const components = Object.keys(activeMotor.intervals);
 
     components.forEach(comp => {
-        const intervalValue = activeMotor.intervals[comp] || DEFAULT_INTERVALS[normalizeMotorType(activeMotor.type)][comp];
-        const defaultVal = DEFAULT_INTERVALS[normalizeMotorType(activeMotor.type)][comp];
+        const intervalValue = activeMotor.intervals[comp];
+        const isCustom = !standardComponents.includes(comp);
+        const defaultVal = !isCustom ? DEFAULT_INTERVALS[normalizeMotorType(activeMotor.type)][comp] : null;
+        const defaultText = isCustom ? "Kustom (Tipe Pengguna)" : `Default: ${defaultVal.toLocaleString('id-ID')} KM`;
 
         // 1. Populate View Mode Grid
         const viewItem = document.createElement('div');
@@ -687,18 +690,31 @@ function renderSettings() {
         viewItem.style.justifyContent = "space-between";
         viewItem.style.gap = "1rem";
 
+        let deleteBtnHtml = "";
+        if (isCustom) {
+            deleteBtnHtml = `
+                <button type="button" class="btn btn-secondary btn-icon btn-delete-custom-comp" data-component="${comp}" style="padding: 0.35rem; color: var(--color-danger); border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.05);" title="Hapus Komponen Kustom">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            `;
+        }
+
         viewItem.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
                 <div class="part-icon" style="width: 32px; height: 32px; flex-shrink: 0; background-color: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--color-primary);">
                     ${COMPONENT_ICONS[comp] || COMPONENT_ICONS["Tune Up"]}
                 </div>
-                <div>
-                    <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">${comp}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Default: ${defaultVal.toLocaleString('id-ID')} KM</div>
+                <div style="overflow: hidden;">
+                    <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${comp}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${defaultText}</div>
                 </div>
             </div>
-            <div style="text-align: right;">
-                <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-primary);">${intervalValue.toLocaleString('id-ID')} <small style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">KM</small></div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-primary);">${parseInt(intervalValue).toLocaleString('id-ID')} <small style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">KM</small></div>
+                ${deleteBtnHtml}
             </div>
         `;
         viewContainer.appendChild(viewItem);
@@ -706,15 +722,34 @@ function renderSettings() {
         // 2. Populate Edit Mode Grid (Inputs)
         const group = document.createElement('div');
         group.className = "form-group";
+        const labelText = isCustom ? `Interval ${comp} (Kustom) (KM)` : `Interval ${comp} (KM)`;
+        const tipText = isCustom ? `Komponen kustom buatan Anda` : `Default pabrikan: ${defaultVal.toLocaleString('id-ID')} KM`;
         group.innerHTML = `
             <label for="interval-input-${comp.replace(/\s+/g, '-')}" style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="display: inline-flex; width: 16px; height: 16px; color: var(--color-primary);">${COMPONENT_ICONS[comp] || COMPONENT_ICONS["Tune Up"]}</span>
-                Interval ${comp} (KM)
+                ${labelText}
             </label>
             <input type="number" id="interval-input-${comp.replace(/\s+/g, '-')}" data-component="${comp}" min="100" max="100000" class="form-control interval-setting-field" value="${intervalValue}" required>
-            <small class="form-tip">Default pabrikan: ${defaultVal.toLocaleString('id-ID')} KM</small>
+            <small class="form-tip">${tipText}</small>
         `;
         inputsContainer.appendChild(group);
+    });
+
+    // Register delete button click listeners
+    viewContainer.querySelectorAll('.btn-delete-custom-comp').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const compToDelete = e.currentTarget.getAttribute('data-component');
+            if (confirm(`Apakah Anda yakin ingin menghapus komponen kustom '${compToDelete}' beserta seluruh data servisnya pada motor ini?`)) {
+                // Delete from intervals
+                delete activeMotor.intervals[compToDelete];
+                // Delete from lastService
+                delete activeMotor.lastService[compToDelete];
+                
+                saveState();
+                refreshAllUI();
+                showToast(`Komponen kustom '${compToDelete}' berhasil dihapus!`, "success");
+            }
+        });
     });
 
     // Reset settings card to View Mode by default when loaded
@@ -922,7 +957,7 @@ function openAddServiceModal(preselectedComponent = null) {
     const cbContainer = document.getElementById('service-components-checkboxes');
     cbContainer.innerHTML = "";
 
-    const comps = getComponentsForType(motor.type);
+    const comps = Object.keys(motor.intervals);
     
     comps.forEach(comp => {
         const isChecked = preselectedComponent === comp;
@@ -1481,6 +1516,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm("Apakah Anda yakin ingin mengembalikan semua interval komponen motor ini ke standar pabrikan?")) {
             resetIntervalsToDefault();
         }
+    });
+
+    // 7c. Custom Component Form Listener
+    document.getElementById('btn-add-custom-comp').addEventListener('click', () => {
+        const motor = getActiveMotorcycle();
+        if (!motor) {
+            alert("Harap pilih/tambahkan motor aktif terlebih dahulu.");
+            return;
+        }
+        document.getElementById('form-custom-component').reset();
+        document.getElementById('input-custom-comp-last-service').value = motor.currentOdo;
+        document.getElementById('input-custom-comp-last-service').max = motor.currentOdo;
+        openModal('modal-custom-component');
+    });
+
+    document.getElementById('form-custom-component').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const motor = getActiveMotorcycle();
+        if (!motor) return;
+
+        const compName = document.getElementById('input-custom-comp-name').value.trim();
+        const intervalVal = parseInt(document.getElementById('input-custom-comp-interval').value);
+        const lastServiceVal = parseInt(document.getElementById('input-custom-comp-last-service').value);
+
+        if (!compName) return;
+
+        // Check duplicate name
+        if (motor.intervals[compName] !== undefined) {
+            alert("Komponen dengan nama ini sudah terdaftar pada motor!");
+            return;
+        }
+
+        // Add
+        motor.intervals[compName] = intervalVal;
+        motor.lastService[compName] = lastServiceVal;
+
+        saveState();
+        closeModal('modal-custom-component');
+        refreshAllUI();
+        showToast(`Komponen kustom '${compName}' berhasil ditambahkan!`, "success");
     });
 
     // 7b. Backup Email Address Listener
