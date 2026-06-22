@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotoServ - Pengingat Servis Motor Pintar</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+
+    <div class="app-container">
+        <!-- Sidebar / Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </div>
+                <h1>Moto<span>Serv</span></h1>
+            </div>
+
+            <!-- Active Motorcycle Selector -->
+            <div class="motorcycle-selector-container">
+                <label for="active-motorcycle-select">Motor Aktif</label>
+                <div class="selector-row">
+                    <div class="select-wrapper">
+                        <select id="active-motorcycle-select" class="custom-select">
+                            <!-- Dynamically filled by JS -->
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary btn-icon-only" id="btn-quick-add-motor" title="Tambah Motor Baru">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Odometer Widget -->
+            <div class="odometer-widget" id="header-odometer-widget">
+                <div class="odo-info">
+                    <span class="odo-label">Odometer Saat Ini</span>
+                    <span class="odo-value" id="header-odometer-value">0 <small>KM</small></span>
+                </div>
+                <button class="btn btn-primary btn-sm btn-icon" id="btn-quick-update-odo" title="Perbarui Odometer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                    </svg>
+                    <span>Update KM</span>
+                </button>
+            </div>
+
+            <!-- Main Navigation -->
+            <nav class="main-nav">
+                <button class="nav-item active" data-tab="dashboard">
+                    <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="9" rx="1"/>
+                        <rect x="14" y="3" width="7" height="5" rx="1"/>
+                        <rect x="14" y="12" width="7" height="9" rx="1"/>
+                        <rect x="3" y="16" width="7" height="5" rx="1"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-tab="riwayat">
+                    <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>Riwayat Servis</span>
+                </button>
+                <button class="nav-item" data-tab="garasi">
+                    <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1 .4-1 1v7c0 .6.4 1 1 1h2M21 17a2 2 0 11-4 0M7 17a2 2 0 11-4 0"/>
+                        <path d="M13 6h-3M16 10H5"/>
+                    </svg>
+                    <span>Garasi</span>
+                </button>
+                <button class="nav-item" data-tab="pengaturan">
+                    <svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <span>Pengaturan</span>
+                </button>
+            </nav>
+
+
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+            <!-- Alert Banner for critical service needs -->
+            <div class="alert-banner" id="global-alert-banner" style="display: none;">
+                <div class="alert-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <div class="alert-message" id="global-alert-text">Beberapa komponen motor Anda telah melebihi batas kilometer servis!</div>
+                <button class="alert-close" onclick="this.parentElement.style.display='none'">&times;</button>
+            </div>
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="section-header">
+                    <div>
+                        <h2>Dashboard Pemantauan</h2>
+                        <p class="section-desc">Status kesehatan suku cadang sepeda motor Anda saat ini.</p>
+                    </div>
+                </div>
+
+                <!-- Motor Info Overview Card -->
+                <div class="overview-card" id="motorcycle-overview-card">
+                    <div class="overview-visual">
+                        <div class="status-gauge">
+                            <svg viewBox="0 0 36 36" class="circular-chart">
+                                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                <path class="circle" id="overall-status-circle" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            </svg>
+                            <div class="gauge-content">
+                                <span class="gauge-value" id="overall-health-pct">100%</span>
+                                <span class="gauge-label">Kesehatan</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overview-details">
+                        <h3 class="motor-name-display" id="info-motor-name">Yamaha NMAX</h3>
+                        <div class="motor-meta">
+                            <span class="badge" id="info-motor-type">Matic</span>
+                            <span class="plate-number" id="info-motor-plate">B 1234 ABC</span>
+                        </div>
+                        <div class="status-indicator-box">
+                            <span class="status-dot green" id="info-status-dot"></span>
+                            <span class="status-text" id="info-status-text">Semua Komponen Baik</span>
+                        </div>
+                        <p class="summary-text" id="info-status-summary">
+                            Perjalanan Anda aman. Belum ada komponen yang membutuhkan perhatian segera.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Parts Status Grid -->
+                <div class="parts-grid-header">
+                    <h3>Status Komponen & Suku Cadang</h3>
+                </div>
+                <div class="parts-grid" id="parts-status-grid">
+                    <!-- Dynamic Component Cards will be loaded here -->
+                </div>
+            </section>
+
+            <!-- TAB 2: RIWAYAT SERVIS -->
+            <section id="tab-riwayat" class="tab-content">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h2>Riwayat Servis</h2>
+                        <p class="section-desc">Catatan servis dan penggantian suku cadang sebelumnya.</p>
+                    </div>
+                    <button class="btn btn-primary btn-icon" id="btn-add-service-log">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Catat Servis Baru</span>
+                    </button>
+                </div>
+
+                <!-- History Filters -->
+                <div class="filters-card">
+                    <div class="filter-group">
+                        <label for="filter-component">Filter Komponen</label>
+                        <select id="filter-component" class="custom-select custom-select-sm">
+                            <option value="all">Semua Komponen</option>
+                            <option value="Oli Mesin">Oli Mesin</option>
+                            <option value="Busi">Busi</option>
+                            <option value="Oli Transmisi">Oli Transmisi</option>
+                            <option value="Ban Depan">Ban Depan</option>
+                            <option value="Ban Belakang">Ban Belakang</option>
+                            <option value="Rantai">Rantai</option>
+                            <option value="Drive Belt">Drive Belt</option>
+                            <option value="Coolant">Coolant</option>
+                            <option value="Kampas Rem">Kampas Rem</option>
+                            <option value="Filter Udara">Filter Udara</option>
+                            <option value="Aki">Aki</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Service History List -->
+                <div class="history-list-container">
+                    <div class="table-responsive">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Odometer Servis</th>
+                                    <th>Komponen</th>
+                                    <th>Biaya (Rp)</th>
+                                    <th>Catatan</th>
+                                    <th style="width: 80px; text-align: center;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="service-history-tbody">
+                                <!-- Filled dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Empty State for History -->
+                    <div class="empty-state" id="history-empty-state" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <h3>Belum ada riwayat servis</h3>
+                        <p>Catat servis pertama Anda untuk mulai melacak performa komponen.</p>
+                        <button class="btn btn-secondary btn-sm" id="btn-empty-add-service">Catat Sekarang</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: GARASI (DAFTAR MOTOR) -->
+            <section id="tab-garasi" class="tab-content">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h2>Garasi Motor</h2>
+                        <p class="section-desc">Kelola kendaraan Anda dan tambahkan motor baru.</p>
+                    </div>
+                    <button class="btn btn-primary btn-icon" id="btn-add-motorcycle">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Tambah Motor</span>
+                    </button>
+                </div>
+
+                <div class="motorcycles-grid" id="motorcycles-list-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+
+            <!-- TAB 4: PENGATURAN INTERVAL -->
+            <section id="tab-pengaturan" class="tab-content">
+                <div class="section-header">
+                    <h2>Pengaturan Batas Servis</h2>
+                    <p class="section-desc">Atur interval kilometer ideal untuk penggantian komponen motor Anda.</p>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Sesuaikan Interval Jarak Tempuh (KM)</h3>
+                        <span class="active-motor-tag" id="settings-motor-tag">Motor Aktif: -</span>
+                    </div>
+                    <div id="settings-view-container">
+                        <!-- Visual intervals grid -->
+                        <div class="form-grid" id="settings-intervals-view">
+                            <!-- Filled dynamically -->
+                        </div>
+                        <div class="settings-actions">
+                            <button type="button" class="btn btn-primary btn-icon" id="btn-edit-intervals">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                </svg>
+                                <span>Ubah Interval</span>
+                            </button>
+                        </div>
+                    </div>
+                    <form id="settings-intervals-form" class="settings-form" style="display: none;">
+                        <!-- Inputs will be dynamically generated based on standard intervals -->
+                        <div class="form-grid" id="settings-intervals-inputs">
+                            <!-- Filled dynamically -->
+                        </div>
+                        <div class="settings-actions">
+                            <button type="button" class="btn btn-secondary" id="btn-reset-intervals-default">Reset ke Default Pabrikan</button>
+                            <button type="button" class="btn btn-secondary" id="btn-cancel-edit-intervals">Batal</button>
+                            <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- BACKUP & RESTORE CARD -->
+                <div class="settings-card backup-restore-card">
+                    <div class="settings-card-header">
+                        <h3>Pencadangan & Pemulihan Data</h3>
+                    </div>
+                    <div class="backup-restore-content" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <p class="text-secondary" style="font-size: 0.95rem; line-height: 1.5;">
+                            Cadangkan seluruh data garasi motor, riwayat servis, dan pengaturan kustom Anda ke dalam berkas cadangan, atau kirimkan salinannya ke email Anda secara aman.
+                        </p>
+                        
+                        <!-- Email Input Form for Backup (Optional) -->
+                        <div class="form-group" style="max-width: 400px; gap: 0.25rem;">
+                            <label for="input-backup-email" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Alamat Email (Opsional)</label>
+                            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                                <span style="position: absolute; left: 0.85rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; pointer-events: none;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                        <polyline points="22,6 12,13 2,6"/>
+                                    </svg>
+                                </span>
+                                <input type="email" id="input-backup-email" class="form-control" placeholder="nama@email.com" style="width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem; font-size: 0.9rem; border-radius: var(--radius-sm);">
+                            </div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Masukkan email jika ingin mengirim draf cadangan ke email.</small>
+                        </div>
+
+                        <!-- Main Backup & Restore Actions -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                            <button type="button" class="btn btn-primary btn-icon" id="btn-backup-now" style="flex: 1; min-width: 160px; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <span>Cadangkan</span>
+                            </button>
+                            
+                            <button type="button" class="btn btn-secondary btn-icon" id="btn-restore-now" style="flex: 1; min-width: 160px; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                <span>Pulihkan</span>
+                            </button>
+                            
+                            <!-- Hidden File Input for Restore -->
+                            <input type="file" id="input-restore-file" accept=".json, .txt" style="display: none;">
+                        </div>
+
+                        <div class="backup-status-anim" id="backup-status-anim" style="display: none; align-items: center; gap: 0.75rem; font-size: 0.9rem; color: var(--color-primary);">
+                            <div class="spinner-small"></div>
+                            <span id="backup-status-text">Memproses cadangan data...</span>
+                        </div>
+                        
+                        <!-- Manual Text Paste Option -->
+                        <div class="manual-text-option" style="margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                            <details style="cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                                <summary style="font-weight: 500; margin-bottom: 0.5rem; color: var(--text-secondary);">Opsi Pemulihan Teks Manual</summary>
+                                <div style="display: flex; flex-direction: column; gap: 0.75rem; padding-top: 0.5rem;">
+                                    <textarea id="textarea-restore-data" class="form-control" rows="3" placeholder="Tempelkan kode teks cadangan (Base64) di sini jika tidak menggunakan berkas .json..." style="font-size: 0.85rem; border-radius: var(--radius-sm);"></textarea>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btn-restore-text-manual" style="align-self: flex-start;">Pulihkan dari Teks</button>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="danger-zone-card">
+                    <h3>Zona Bahaya</h3>
+                    <p>Mereset semua data aplikasi akan menghapus seluruh motor, riwayat servis, dan pengaturan yang tersimpan.</p>
+                    <button class="btn btn-danger" id="btn-factory-reset">Hapus Semua Data Aplikasi</button>
+                </div>
+            </section>
+
+            <!-- Footer Copyright -->
+            <footer class="app-footer">
+                <p>&copy; 2026 MotoServ. Dibuat oleh <a href="https://www.linkedin.com/in/amujahidakbar/" target="_blank" rel="noopener noreferrer">Mujahid Akbar</a>.</p>
+            </footer>
+        </main>
+    </div>
+
+    <!-- MODAL 1: UPDATE ODOMETER -->
+    <div class="modal-backdrop" id="modal-update-odo">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>Perbarui Odometer</h3>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <form id="form-update-odo">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="input-odo-value">Odometer Saat Ini (KM)</label>
+                        <input type="number" id="input-odo-value" min="0" required class="form-control" placeholder="Contoh: 15400">
+                        <small class="form-tip">Masukkan kilometer yang tertera pada speedometer motor Anda sekarang.</small>
+                    </div>
+                    <div class="odo-diff-preview" id="odo-diff-preview" style="display:none;">
+                        Kenaikan jarak tempuh: <span id="odo-diff-val">0</span> KM
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-close-modal-btn">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CATAT SERVIS -->
+    <div class="modal-backdrop" id="modal-add-service">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-header">
+                <h3 id="modal-service-title">Catat Servis Baru</h3>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <form id="form-add-service">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group col">
+                            <label for="input-service-date">Tanggal Servis</label>
+                            <input type="date" id="input-service-date" required class="form-control">
+                        </div>
+                        <div class="form-group col">
+                            <label for="input-service-odo">Odometer Saat Servis (KM)</label>
+                            <input type="number" id="input-service-odo" min="0" required class="form-control" placeholder="Contoh: 15000">
+                            <small class="form-tip">Odometer motor saat servis ini dilakukan.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pilih Komponen yang Diservis / Diganti</label>
+                        <div class="checkbox-grid" id="service-components-checkboxes">
+                            <!-- Filled dynamically but here are the main options -->
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col">
+                            <label for="input-service-cost">Total Biaya (Rp)</label>
+                            <input type="number" id="input-service-cost" min="0" class="form-control" placeholder="Contoh: 150000">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-service-notes">Catatan Tambahan</label>
+                        <textarea id="input-service-notes" class="form-control" rows="3" placeholder="Contoh: Ganti oli merk X, sekalian bersihkan filter udara."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-close-modal-btn">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Catatan Servis</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: TAMBAH/EDIT MOTOR -->
+    <div class="modal-backdrop" id="modal-motorcycle-form">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="motor-modal-title">Tambah Motor Baru</h3>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <form id="form-motorcycle">
+                <input type="hidden" id="input-motor-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="input-motor-name">Nama Motor / Model</label>
+                        <input type="text" id="input-motor-name" required class="form-control" placeholder="Contoh: Vario 160, NMAX, CRF 150">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-motor-brand">Merk</label>
+                        <select id="input-motor-brand" class="custom-select form-control">
+                            <option value="Honda">Honda</option>
+                            <option value="Yamaha">Yamaha</option>
+                            <option value="Suzuki">Suzuki</option>
+                            <option value="Kawasaki">Kawasaki</option>
+                            <option value="Lainnya">Lainnya / Merk Lain</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col">
+                            <label for="input-motor-plate">Nomor Polisi (Opsional)</label>
+                            <input type="text" id="input-motor-plate" class="form-control" placeholder="Contoh: B 1234 ABC">
+                        </div>
+                        <div class="form-group col">
+                            <label for="input-motor-type">Tipe Motor</label>
+                            <select id="input-motor-type" class="custom-select form-control">
+                                <option value="Matic">Matic (Skuter)</option>
+                                <option value="Manual">Bebek (Manual)</option>
+                                <option value="Kopling">Sport (Kopling)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-motor-odo">Odometer Awal (KM)</label>
+                        <input type="number" id="input-motor-odo" min="0" required class="form-control" placeholder="Contoh: 12000">
+                        <small class="form-tip">Jarak tempuh motor saat ini.</small>
+                    </div>
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                        <input type="checkbox" id="input-motor-active" checked style="width: 18px; height: 18px; accent-color: var(--color-primary); cursor: pointer;">
+                        <label for="input-motor-active" style="cursor: pointer; user-select: none; font-size: 0.95rem; font-weight: 500;">Jadikan sebagai Motor Aktif</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-close-modal-btn">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btn-motor-submit">Tambah Motor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-notification" class="toast">
+        <span id="toast-message">Notifikasi Berhasil!</span>
+    </div>
+
+    <!-- App Logic Script -->
+    <script src="app.js"></script>
+</body>
+</html>
