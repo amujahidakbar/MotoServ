@@ -1331,7 +1331,11 @@ function initGoogleServices() {
                             console.log("Auto-sync: Trying to refresh access token silently...");
                             window.isSilentAuth = true;
                             try {
-                                window.tokenClient.requestAccessToken({ prompt: 'none' });
+                                const requestOptions = { prompt: 'none' };
+                                if (state.userEmail && state.userEmail.trim() !== "") {
+                                    requestOptions.login_hint = state.userEmail.trim();
+                                }
+                                window.tokenClient.requestAccessToken(requestOptions);
                             } catch (e) {
                                 console.error("Silent access token fetch failed on load:", e);
                                 window.isSilentAuth = false;
@@ -1414,8 +1418,17 @@ function initTokenClient() {
 }
 
 function connectGoogleDrive() {
+    if (!state.userEmail || state.userEmail.trim() === "") {
+        showToast("Harap isi alamat email terlebih dahulu pada form Pencadangan & Pemulihan Data!", "warning");
+        const inputBackupEmail = document.getElementById('input-backup-email');
+        if (inputBackupEmail) inputBackupEmail.focus();
+        return;
+    }
+
     if (!state.googleClientId || state.googleClientId.trim() === "") {
-        showToast("Harap masukkan Google Client ID terlebih dahulu!", "warning");
+        showToast("Harap masukkan Google Client ID terlebih dahulu di menu Konfigurasi Lanjutan!", "warning");
+        const detailsEl = document.querySelector('.gdrive-advanced-config details');
+        if (detailsEl) detailsEl.open = true;
         return;
     }
 
@@ -1431,7 +1444,10 @@ function connectGoogleDrive() {
     window.isSilentAuth = false;
     
     try {
-        window.tokenClient.requestAccessToken({ prompt: 'consent' });
+        window.tokenClient.requestAccessToken({ 
+            prompt: 'consent',
+            login_hint: state.userEmail.trim()
+        });
     } catch (e) {
         console.error("Request access token failed:", e);
         setDriveSyncingState(false);
@@ -1599,7 +1615,11 @@ async function uploadBackupToDrive(isUserInitiated = false) {
             window.isSilentAuth = true;
             try {
                 if (window.tokenClient) {
-                    window.tokenClient.requestAccessToken({ prompt: 'none' });
+                    const requestOptions = { prompt: 'none' };
+                    if (state.userEmail && state.userEmail.trim() !== "") {
+                        requestOptions.login_hint = state.userEmail.trim();
+                    }
+                    window.tokenClient.requestAccessToken(requestOptions);
                 }
             } catch (e) {
                 console.error("Silent authentication failed during auto-sync:", e);

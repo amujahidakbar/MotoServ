@@ -43,8 +43,12 @@ Karena aplikasi ini berjalan sepenuhnya di sisi klien (*client-side*) lokal, And
 4. Masuk ke **Credentials &gt; Create Credentials &gt; OAuth client ID**.
 5. Pilih tipe aplikasi **Web application**.
 6. Pada bagian **Authorized JavaScript origins**, tambahkan URL lokal Anda: `http://localhost:8000`.
-7. Salin **Client ID** yang terbit, lalu tempelkan ke kolom input di tab **Pengaturan** MotoServ.
-8. Klik **Hubungkan Akun Google** dan setujui izin akses folder aplikasi (`drive.file`).
+7. Salin **Client ID** yang terbit.
+8. Di tab **Pengaturan** MotoServ:
+   - Isi kolom **Alamat Email** dengan email Google yang akan dituju.
+   - Buka lipatan panel **Konfigurasi Google Drive Lanjutan** dan tempelkan Client ID Anda ke kolom input.
+   - Klik **Hubungkan ke Google Drive**. Google OAuth secara otomatis akan mengarahkan otorisasi ke alamat email yang Anda isi (menggunakan parameter `login_hint`).
+   - Setujui izin akses folder aplikasi (`drive.file`).
 
 ## Struktur Proyek
 
