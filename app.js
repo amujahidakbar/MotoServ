@@ -706,17 +706,14 @@ function renderSettings() {
         viewItem.style.justifyContent = "space-between";
         viewItem.style.gap = "1rem";
 
-        let deleteBtnHtml = "";
-        if (isCustom) {
-            deleteBtnHtml = `
-                <button type="button" class="btn btn-secondary btn-icon btn-delete-custom-comp" data-component="${comp}" style="padding: 0.35rem; color: var(--color-danger); border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.05);" title="Hapus Komponen Kustom">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            `;
-        }
+        const deleteBtnHtml = `
+            <button type="button" class="btn btn-secondary btn-icon btn-delete-custom-comp" data-component="${comp}" style="padding: 0.35rem; color: var(--color-danger); border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.05);" title="Hapus Komponen">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+        `;
 
         viewItem.innerHTML = `
             <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
@@ -755,7 +752,14 @@ function renderSettings() {
     viewContainer.querySelectorAll('.btn-delete-custom-comp').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const compToDelete = e.currentTarget.getAttribute('data-component');
-            if (confirm(`Apakah Anda yakin ingin menghapus komponen kustom '${compToDelete}' beserta seluruh data servisnya pada motor ini?`)) {
+            const standardComponents = getComponentsForType(activeMotor.type);
+            const isStd = standardComponents.includes(compToDelete);
+            
+            const message = isStd 
+                ? `Apakah Anda yakin ingin menghapus komponen standar pabrikan '${compToDelete}' beserta seluruh data servisnya pada motor ini?\n\nAnda dapat mengembalikannya nanti dengan mengklik 'Reset ke Default Pabrikan'.`
+                : `Apakah Anda yakin ingin menghapus komponen kustom '${compToDelete}' beserta seluruh data servisnya pada motor ini?`;
+
+            if (confirm(message)) {
                 // Delete from intervals
                 delete activeMotor.intervals[compToDelete];
                 // Delete from lastService
@@ -763,7 +767,7 @@ function renderSettings() {
                 
                 saveState();
                 refreshAllUI();
-                showToast(`Komponen kustom '${compToDelete}' berhasil dihapus!`, "success");
+                showToast(`Komponen '${compToDelete}' berhasil dihapus!`, "success");
             }
         });
     });
