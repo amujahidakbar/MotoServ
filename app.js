@@ -61,7 +61,12 @@ let state = {
     activeMotorcycleId: "",
     serviceHistory: [],
     userEmail: "",
-    isLoggedIn: false
+    isLoggedIn: false,
+    googleClientId: "",
+    googleDriveConnected: false,
+    googleDriveAutoSync: false,
+    googleDriveFileId: "",
+    googleDriveLastSync: ""
 };
 
 // --- Helper Functions ---
@@ -103,6 +108,10 @@ function getComponentsForType(type) {
 // --- Local Storage Management ---
 function saveState() {
     localStorage.setItem('motoserv_state', JSON.stringify(state));
+    // Trigger debounced auto sync if enabled
+    if (typeof debouncedAutoSync === 'function') {
+        debouncedAutoSync();
+    }
 }
 
 function loadState() {
@@ -113,6 +122,13 @@ function loadState() {
             // Ensure session keys exist
             if (state.userEmail === undefined) state.userEmail = "";
             if (state.isLoggedIn === undefined) state.isLoggedIn = false;
+            
+            // Ensure Google Drive keys exist
+            if (state.googleClientId === undefined) state.googleClientId = "";
+            if (state.googleDriveConnected === undefined) state.googleDriveConnected = false;
+            if (state.googleDriveAutoSync === undefined) state.googleDriveAutoSync = false;
+            if (state.googleDriveFileId === undefined) state.googleDriveFileId = "";
+            if (state.googleDriveLastSync === undefined) state.googleDriveLastSync = "";
         } catch (e) {
             console.error("Error parsing saved state, resetting...", e);
             seedDemoData();
@@ -1283,12 +1299,446 @@ function triggerFileBackup() {
         navigator.clipboard.writeText(base64Str)
             .catch(err => console.log("Clipboard fallback copy failed", err));
             
-        return true;
     } catch (e) {
         console.error("File backup failed", e);
         showToast("Pencadangan data gagal!", "danger");
         return false;
     }
+}
+
+// --- Google Drive Auto-Sync Operations ---
+
+// Wait for Google Identity Services & GAPI to load, then initialize
+function initGoogleServices() {
+    let attempts = 0;
+    const checkInterval = setInterval(() => {
+        attempts++;
+        if (typeof google !== 'undefined' && typeof gapi !== 'undefined') {
+            clearInterval(checkInterval);
+            console.log("Google scripts loaded successfully.");
+            
+            // Initialize GAPI client for discovery doc
+            gapi.load('client', () => {
+                gapi.client.init({
+                    discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
+                }).then(() => {
+                    console.log("GAPI Client library initialized.");
+                    if (state.googleClientId) {
+                        initTokenClient();
+                        
+                        // Silent token request if previously connected
+                        if (state.googleDriveConnected) {
+                            console.log("Auto-sync: Trying to refresh access token silently...");
+                            window.isSilentAuth = true;
+                            try {
+                                window.tokenClient.requestAccessToken({ prompt: 'none' });
+                            } catch (e) {
+                                console.error("Silent access token fetch failed on load:", e);
+                                window.isSilentAuth = false;
+                            }
+                        }
+                    }
+                }).catch(err => {
+                    console.error("GAPI Client init error:", err);
+                });
+            });
+        } else if (attempts > 30) { // Timeout after 15s
+            clearInterval(checkInterval);
+            console.warn("Google scripts failed to load or are blocked by browser extensions/offline mode.");
+        }
+    }, 500);
+}
+
+function initTokenClient() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        return false;
+    }
+    if (!state.googleClientId) {
+        return false;
+    }
+
+    try {
+        window.tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: state.googleClientId,
+            scope: 'https://www.googleapis.com/auth/drive.file',
+            callback: (tokenResponse) => {
+                if (tokenResponse.error !== undefined) {
+                    console.error("OAuth error token callback:", tokenResponse);
+                    
+                    if (window.isSilentAuth) {
+                        // Silent check failed, do not disrupt connected state yet
+                        window.isSilentAuth = false;
+                        window.gdriveAccessToken = null;
+                    } else {
+                        // Manual or auto sync failure
+                        state.googleDriveConnected = false;
+                        window.gdriveAccessToken = null;
+                        saveState();
+                        updateGoogleDriveUI();
+                        showToast("Sesi Google Drive kedaluwarsa. Silakan hubungkan kembali.", "warning");
+                    }
+                    
+                    window.pendingDriveAction = null;
+                    setDriveSyncingState(false);
+                    return;
+                }
+
+                window.isSilentAuth = false;
+                window.gdriveAccessToken = tokenResponse.access_token;
+                gapi.client.setToken(tokenResponse);
+                state.googleDriveConnected = true;
+                saveState();
+                updateGoogleDriveUI();
+                
+                // Fire pending actions if any
+                if (window.pendingDriveAction === 'backup') {
+                    window.pendingDriveAction = null;
+                    uploadBackupToDrive(true);
+                } else if (window.pendingDriveAction === 'restore') {
+                    window.pendingDriveAction = null;
+                    downloadBackupFromDrive();
+                } else {
+                    showToast("Berhasil terhubung ke Google Drive!", "success");
+                    // Sync immediately if auto-sync is on
+                    if (state.googleDriveAutoSync) {
+                        uploadBackupToDrive();
+                    }
+                }
+            }
+        });
+        return true;
+    } catch (e) {
+        console.error("Error creating token client:", e);
+        return false;
+    }
+}
+
+function connectGoogleDrive() {
+    if (!state.googleClientId || state.googleClientId.trim() === "") {
+        showToast("Harap masukkan Google Client ID terlebih dahulu!", "warning");
+        return;
+    }
+
+    if (!window.tokenClient) {
+        const ok = initTokenClient();
+        if (!ok) {
+            showToast("Gagal menginisialisasi Google Auth. Periksa Client ID Anda.", "danger");
+            return;
+        }
+    }
+
+    setDriveSyncingState(true, "Menghubungkan ke Google Drive...");
+    window.isSilentAuth = false;
+    
+    try {
+        window.tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (e) {
+        console.error("Request access token failed:", e);
+        setDriveSyncingState(false);
+        showToast("Gagal membuka jendela otentikasi Google.", "danger");
+    }
+}
+
+function disconnectGoogleDrive() {
+    if (window.gdriveAccessToken) {
+        try {
+            google.accounts.oauth2.revoke(window.gdriveAccessToken, () => {
+                console.log("Token revoked.");
+            });
+        } catch (e) {
+            console.error("Error revoking token:", e);
+        }
+    }
+
+    window.gdriveAccessToken = null;
+    if (typeof gapi !== 'undefined' && gapi.client) {
+        gapi.client.setToken(null);
+    }
+    state.googleDriveConnected = false;
+    state.googleDriveFileId = "";
+    saveState();
+    updateGoogleDriveUI();
+    showToast("Koneksi Google Drive terputus.", "success");
+}
+
+function setDriveSyncingState(isSyncing, message = "") {
+    const statusAnim = document.getElementById('gdrive-status-anim');
+    const statusText = document.getElementById('gdrive-status-text');
+    const statusBadge = document.getElementById('gdrive-status-badge');
+
+    if (isSyncing) {
+        if (statusAnim) statusAnim.style.display = "flex";
+        if (statusText) statusText.textContent = message;
+        if (statusBadge) {
+            statusBadge.className = "sync-badge status-syncing";
+            statusBadge.textContent = "Sinkronisasi...";
+        }
+    } else {
+        if (statusAnim) statusAnim.style.display = "none";
+        updateGoogleDriveUI();
+    }
+}
+
+function updateGoogleDriveUI() {
+    const inputClientId = document.getElementById('input-gdrive-client-id');
+    const btnConnect = document.getElementById('btn-gdrive-connect');
+    const btnDisconnect = document.getElementById('btn-gdrive-disconnect');
+    const connectedOptions = document.getElementById('gdrive-connected-options');
+    const statusBadge = document.getElementById('gdrive-status-badge');
+    const checkboxAuto = document.getElementById('checkbox-gdrive-auto');
+    const lastSyncText = document.getElementById('gdrive-last-sync-text');
+
+    if (inputClientId && document.activeElement !== inputClientId) {
+        inputClientId.value = state.googleClientId || "";
+    }
+
+    if (state.googleDriveConnected) {
+        if (btnConnect) btnConnect.style.display = "none";
+        if (btnDisconnect) btnDisconnect.style.display = "inline-flex";
+        if (connectedOptions) connectedOptions.style.display = "flex";
+
+        if (statusBadge) {
+            statusBadge.className = "sync-badge status-connected";
+            statusBadge.textContent = "Terhubung";
+        }
+    } else {
+        if (btnConnect) btnConnect.style.display = "inline-flex";
+        if (btnDisconnect) btnDisconnect.style.display = "none";
+        if (connectedOptions) connectedOptions.style.display = "none";
+
+        if (statusBadge) {
+            statusBadge.className = "sync-badge status-disconnected";
+            statusBadge.textContent = "Terputus";
+        }
+    }
+
+    if (checkboxAuto) checkboxAuto.checked = !!state.googleDriveAutoSync;
+    if (lastSyncText) {
+        lastSyncText.textContent = `Terakhir dicadangkan: ${state.googleDriveLastSync || 'Belum pernah'}`;
+    }
+}
+
+async function uploadToDriveFetch(fileContent, fileId = null) {
+    const boundary = '314159265358979323846';
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const close_delim = "\r\n--" + boundary + "--";
+
+    const contentType = 'multipart/related; boundary=' + boundary;
+    const metadata = {
+        'name': 'motoserv_backup.json',
+        'mimeType': 'application/json'
+    };
+
+    const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        fileContent +
+        close_delim;
+
+    const url = fileId
+        ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
+        : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+
+    const method = fileId ? 'PATCH' : 'POST';
+
+    const response = await fetch(url, {
+        method: method,
+        headers: {
+            'Authorization': 'Bearer ' + window.gdriveAccessToken,
+            'Content-Type': contentType
+        },
+        body: multipartRequestBody
+    });
+
+    if (!response.ok) {
+        throw new Error("Google Drive API returned status " + response.status);
+    }
+
+    return await response.json();
+}
+
+async function findBackupFileOnDrive() {
+    try {
+        const response = await fetch("https://www.googleapis.com/drive/v3/files?q=name%3D'motoserv_backup.json'+and+trashed%3Dfalse&spaces=drive&fields=files(id%2Cname)", {
+            headers: {
+                'Authorization': 'Bearer ' + window.gdriveAccessToken
+            }
+        });
+        if (!response.ok) return null;
+        const result = await response.json();
+        if (result.files && result.files.length > 0) {
+            return result.files[0].id;
+        }
+    } catch (e) {
+        console.error("Error searching for backup file on Google Drive:", e);
+    }
+    return null;
+}
+
+async function uploadBackupToDrive(isUserInitiated = false) {
+    if (!state.googleDriveConnected || !state.googleClientId) {
+        if (isUserInitiated) {
+            showToast("Google Drive belum terhubung. Menghubungkan...", "info");
+            window.pendingDriveAction = 'backup';
+            connectGoogleDrive();
+        }
+        return;
+    }
+
+    // Verify valid access token
+    if (!window.gdriveAccessToken) {
+        if (isUserInitiated) {
+            window.pendingDriveAction = 'backup';
+            connectGoogleDrive();
+        } else {
+            // Attempt silent auth
+            console.log("Access token is missing. Trying silent OAuth fetch...");
+            window.isSilentAuth = true;
+            try {
+                if (window.tokenClient) {
+                    window.tokenClient.requestAccessToken({ prompt: 'none' });
+                }
+            } catch (e) {
+                console.error("Silent authentication failed during auto-sync:", e);
+                window.isSilentAuth = false;
+            }
+        }
+        return;
+    }
+
+    setDriveSyncingState(true, "Mengunggah data ke Google Drive...");
+
+    try {
+        const backupObj = {
+            motorcycles: state.motorcycles,
+            serviceHistory: state.serviceHistory,
+            userEmail: state.userEmail || ""
+        };
+        const jsonStr = JSON.stringify(backupObj, null, 2);
+
+        let fileId = state.googleDriveFileId;
+        if (!fileId) {
+            fileId = await findBackupFileOnDrive();
+        }
+
+        const result = await uploadToDriveFetch(jsonStr, fileId);
+
+        if (result.id) {
+            state.googleDriveFileId = result.id;
+            const now = new Date();
+            state.googleDriveLastSync = now.toLocaleString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            saveState();
+            updateGoogleDriveUI();
+
+            if (isUserInitiated) {
+                showToast("Berhasil dicadangkan ke Google Drive!", "success");
+            }
+        } else {
+            throw new Error("Unggahan gagal. ID berkas tidak diperoleh.");
+        }
+    } catch (err) {
+        console.error("Google Drive backup failed:", err);
+        if (isUserInitiated) {
+            showToast("Gagal mencadangkan ke Google Drive.", "danger");
+        }
+    } finally {
+        setDriveSyncingState(false);
+    }
+}
+
+async function downloadBackupFromDrive() {
+    if (!state.googleDriveConnected || !state.googleClientId) {
+        showToast("Google Drive belum terhubung. Menghubungkan...", "info");
+        window.pendingDriveAction = 'restore';
+        connectGoogleDrive();
+        return;
+    }
+
+    if (!window.gdriveAccessToken) {
+        window.pendingDriveAction = 'restore';
+        connectGoogleDrive();
+        return;
+    }
+
+    if (!confirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin memulihkan?")) {
+        return;
+    }
+
+    setDriveSyncingState(true, "Mengunduh cadangan dari Google Drive...");
+
+    try {
+        let fileId = state.googleDriveFileId;
+        if (!fileId) {
+            fileId = await findBackupFileOnDrive();
+        }
+
+        if (!fileId) {
+            showToast("Berkas cadangan 'motoserv_backup.json' tidak ditemukan di Drive Anda.", "warning");
+            return;
+        }
+
+        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+            headers: {
+                'Authorization': 'Bearer ' + window.gdriveAccessToken
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error("Google Drive download returned status " + response.status);
+        }
+
+        const backupObj = await response.json();
+        const jsonStr = JSON.stringify(backupObj);
+
+        // Run the local restore data utility
+        if (restoreBackupData(jsonStr)) {
+            const now = new Date();
+            state.googleDriveLastSync = now.toLocaleString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            state.googleDriveFileId = fileId;
+            saveState();
+            updateGoogleDriveUI();
+            
+            showToast("Data berhasil dipulihkan dari Google Drive!", "success");
+        }
+    } catch (err) {
+        console.error("Google Drive restore failed:", err);
+        showToast("Gagal mengunduh atau memulihkan data cadangan.", "danger");
+    } finally {
+        setDriveSyncingState(false);
+    }
+}
+
+// Debounce background uploads to prevent spamming the Drive API
+let autoSyncTimeout = null;
+function debouncedAutoSync() {
+    if (!state.googleDriveConnected || !state.googleDriveAutoSync || !window.gdriveAccessToken) {
+        return;
+    }
+    if (autoSyncTimeout) {
+        clearTimeout(autoSyncTimeout);
+    }
+    autoSyncTimeout = setTimeout(() => {
+        uploadBackupToDrive().catch(err => {
+            console.error("Background auto-sync failed:", err);
+        });
+    }, 2000);
 }
 
 // Toast notification trigger
@@ -1310,6 +1760,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Load data & Initialize UI
     loadState();
     refreshAllUI();
+    updateGoogleDriveUI();
+    initGoogleServices();
 
     // 2. Tab Navigation
     document.querySelectorAll('.nav-item').forEach(btn => {
@@ -1660,6 +2112,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelector('.nav-item[data-tab="dashboard"]').click();
             }
         }
+    });
+
+    // 11. Google Drive Sync Event Listeners
+    // Connect Google Drive button
+    document.getElementById('btn-gdrive-connect').addEventListener('click', connectGoogleDrive);
+
+    // Disconnect Google Drive button
+    document.getElementById('btn-gdrive-disconnect').addEventListener('click', disconnectGoogleDrive);
+
+    // Auto sync checkbox toggle
+    document.getElementById('checkbox-gdrive-auto').addEventListener('change', (e) => {
+        state.googleDriveAutoSync = e.target.checked;
+        saveState();
+        showToast(state.googleDriveAutoSync 
+            ? "Pencadangan otomatis diaktifkan!" 
+            : "Pencadangan otomatis dinonaktifkan!", "info");
+    });
+
+    // Manual backup to Drive button
+    document.getElementById('btn-gdrive-backup-now').addEventListener('click', () => {
+        uploadBackupToDrive(true);
+    });
+
+    // Manual restore from Drive button
+    document.getElementById('btn-gdrive-restore-now').addEventListener('click', () => {
+        downloadBackupFromDrive();
+    });
+
+    // Client ID Input change listener
+    document.getElementById('input-gdrive-client-id').addEventListener('change', (e) => {
+        const newVal = e.target.value.trim();
+        if (newVal !== state.googleClientId) {
+            state.googleClientId = newVal;
+            // Reset connection if client ID changed
+            window.tokenClient = null;
+            window.gdriveAccessToken = null;
+            state.googleDriveConnected = false;
+            state.googleDriveFileId = "";
+            saveState();
+            updateGoogleDriveUI();
+            initTokenClient();
+            showToast("Google Client ID berhasil disimpan!", "success");
+        }
+    });
+
+    // Help documentation link listener
+    document.getElementById('link-gdrive-help').addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal('modal-gdrive-help');
     });
 
     // Filter History Component dropdown listener
