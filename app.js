@@ -557,9 +557,9 @@ function renderHistory() {
     document.querySelectorAll('.btn-delete-log').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const id = e.currentTarget.getAttribute('data-id');
-            if (confirm("Apakah Anda yakin ingin menghapus catatan servis ini? Ini akan memulihkan status servis sebelumnya jika Anda mereset manual.")) {
+            showCustomConfirm("Apakah Anda yakin ingin menghapus catatan servis ini? Ini akan memulihkan status servis sebelumnya jika Anda mereset manual.", () => {
                 deleteServiceLog(id);
-            }
+            });
         });
     });
 }
@@ -659,9 +659,9 @@ function renderGarage() {
                 alert("Anda tidak dapat menghapus satu-satunya motor Anda di garasi!");
                 return;
             }
-            if (confirm("Apakah Anda yakin ingin menghapus motor ini? Semua riwayat servis motor ini juga akan dihapus permanen.")) {
+            showCustomConfirm("Apakah Anda yakin ingin menghapus motor ini? Semua riwayat servis motor ini juga akan dihapus permanen.", () => {
                 deleteMotorcycle(id);
-            }
+            });
         });
     });
 }
@@ -759,7 +759,7 @@ function renderSettings() {
                 ? `Apakah Anda yakin ingin menghapus komponen standar pabrikan '${compToDelete}' beserta seluruh data servisnya pada motor ini?\n\nAnda dapat mengembalikannya nanti dengan mengklik 'Reset ke Default Pabrikan'.`
                 : `Apakah Anda yakin ingin menghapus komponen kustom '${compToDelete}' beserta seluruh data servisnya pada motor ini?`;
 
-            if (confirm(message)) {
+            showCustomConfirm(message, () => {
                 // Delete from intervals
                 delete activeMotor.intervals[compToDelete];
                 // Delete from lastService
@@ -768,7 +768,7 @@ function renderSettings() {
                 saveState();
                 refreshAllUI();
                 showToast(`Komponen '${compToDelete}' berhasil dihapus!`, "success");
-            }
+            });
         });
     });
 
@@ -1160,12 +1160,12 @@ function verifyOtpSimulated(enteredOtp) {
 }
 
 function logoutUser() {
-    if (confirm("Apakah Anda yakin ingin keluar? Sesi aktif Anda akan diakhiri.")) {
+    showCustomConfirm("Apakah Anda yakin ingin keluar? Sesi aktif Anda akan diakhiri.", () => {
         state.isLoggedIn = false;
         saveState();
         checkLoginStatus();
         showToast("Anda telah keluar.", "success");
-    }
+    });
 }
 
 // --- Backup & Restore Logic ---
@@ -1694,59 +1694,58 @@ async function downloadBackupFromDrive() {
         return;
     }
 
-    if (!confirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin memulihkan?")) {
-        return;
-    }
+    showCustomConfirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin memulihkan?", async () => {
+        setDriveSyncingState(true, "Mengunduh cadangan dari Google Drive...");
 
-    setDriveSyncingState(true, "Mengunduh cadangan dari Google Drive...");
-
-    try {
-        let fileId = state.googleDriveFileId;
-        if (!fileId) {
-            fileId = await findBackupFileOnDrive();
-        }
-
-        if (!fileId) {
-            showToast("Berkas cadangan 'motoserv_backup.json' tidak ditemukan di Drive Anda.", "warning");
-            return;
-        }
-
-        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-            headers: {
-                'Authorization': 'Bearer ' + window.gdriveAccessToken
+        try {
+            let fileId = state.googleDriveFileId;
+            if (!fileId) {
+                fileId = await findBackupFileOnDrive();
             }
-        });
 
-        if (!response.ok) {
-            throw new Error("Google Drive download returned status " + response.status);
-        }
+            if (!fileId) {
+                showToast("Berkas cadangan 'motoserv_backup.json' tidak ditemukan di Drive Anda.", "warning");
+                setDriveSyncingState(false);
+                return;
+            }
 
-        const backupObj = await response.json();
-        const jsonStr = JSON.stringify(backupObj);
-
-        // Run the local restore data utility
-        if (restoreBackupData(jsonStr)) {
-            const now = new Date();
-            state.googleDriveLastSync = now.toLocaleString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                headers: {
+                    'Authorization': 'Bearer ' + window.gdriveAccessToken
+                }
             });
-            state.googleDriveFileId = fileId;
-            saveState();
-            updateGoogleDriveUI();
-            
-            showToast("Data berhasil dipulihkan dari Google Drive!", "success");
+
+            if (!response.ok) {
+                throw new Error("Google Drive download returned status " + response.status);
+            }
+
+            const backupObj = await response.json();
+            const jsonStr = JSON.stringify(backupObj);
+
+            // Run the local restore data utility
+            if (restoreBackupData(jsonStr)) {
+                const now = new Date();
+                state.googleDriveLastSync = now.toLocaleString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                state.googleDriveFileId = fileId;
+                saveState();
+                updateGoogleDriveUI();
+                
+                showToast("Data berhasil dipulihkan dari Google Drive!", "success");
+            }
+        } catch (err) {
+            console.error("Google Drive restore failed:", err);
+            showToast("Gagal mengunduh atau memulihkan data cadangan.", "danger");
+        } finally {
+            setDriveSyncingState(false);
         }
-    } catch (err) {
-        console.error("Google Drive restore failed:", err);
-        showToast("Gagal mengunduh atau memulihkan data cadangan.", "danger");
-    } finally {
-        setDriveSyncingState(false);
-    }
+    });
 }
 
 // Debounce background uploads to prevent spamming the Drive API
@@ -1776,6 +1775,50 @@ function showToast(message, type = "success") {
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
+}
+
+function showCustomConfirm(message, callback) {
+    const modal = document.getElementById('modal-confirm');
+    const msgEl = document.getElementById('confirm-modal-message');
+    const btnCancel = document.getElementById('btn-confirm-cancel');
+    const btnProceed = document.getElementById('btn-confirm-proceed');
+    const btnCloseX = document.getElementById('btn-close-confirm-x');
+
+    if (!modal || !msgEl) {
+        if (confirm(message)) {
+            callback();
+        }
+        return;
+    }
+
+    msgEl.innerText = message;
+    openModal('modal-confirm');
+
+    function cleanup() {
+        closeModal('modal-confirm');
+        const newCancel = btnCancel.cloneNode(true);
+        const newProceed = btnProceed.cloneNode(true);
+        const newCloseX = btnCloseX.cloneNode(true);
+        
+        btnCancel.replaceWith(newCancel);
+        btnProceed.replaceWith(newProceed);
+        btnCloseX.replaceWith(newCloseX);
+    }
+
+    document.getElementById('btn-confirm-cancel').addEventListener('click', () => {
+        cleanup();
+    });
+
+    document.getElementById('btn-close-confirm-x').addEventListener('click', () => {
+        cleanup();
+    });
+
+    document.getElementById('btn-confirm-proceed').addEventListener('click', () => {
+        cleanup();
+        if (typeof callback === 'function') {
+            callback();
+        }
+    });
 }
 
 // --- App Initialization & Event Listeners ---
@@ -1889,15 +1932,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const odo = parseInt(document.getElementById('input-motor-odo').value);
         const setActive = document.getElementById('input-motor-active').checked;
 
-        if (id) {
-            // Edit existing
-            const motorIndex = state.motorcycles.findIndex(m => m.id === id);
-            if (motorIndex !== -1) {
-                const motor = state.motorcycles[motorIndex];
-                
-                // If type changed, check if component list is different, reseed default lastService accordingly
-                if (motor.type !== type) {
-                    if (confirm("Mengubah tipe motor akan mengatur ulang interval servis komponen ke tipe baru. Lanjutkan?")) {
+        function proceedSave() {
+            if (id) {
+                // Edit existing
+                const motorIndex = state.motorcycles.findIndex(m => m.id === id);
+                if (motorIndex !== -1) {
+                    const motor = state.motorcycles[motorIndex];
+                    
+                    // If type changed, check if component list is different, reseed default lastService accordingly
+                    if (motor.type !== type) {
                         const normType = normalizeMotorType(type);
                         motor.intervals = { ...DEFAULT_INTERVALS[normType] };
                         
@@ -1907,61 +1950,71 @@ document.addEventListener('DOMContentLoaded', () => {
                             newLastService[comp] = motor.lastService[comp] || 0;
                         });
                         motor.lastService = newLastService;
-                    } else {
-                        return; // cancel submit
                     }
+
+                    motor.name = name;
+                    motor.brand = brand;
+                    motor.plate = plate;
+                    motor.type = type;
+                    motor.currentOdo = odo;
+                    
+                    if (setActive) {
+                        state.activeMotorcycleId = id;
+                    } else if (state.activeMotorcycleId === id) {
+                        // If it was active and user unchecked it, switch to another motor
+                        const otherMotor = state.motorcycles.find(m => m.id !== id);
+                        state.activeMotorcycleId = otherMotor ? otherMotor.id : id;
+                    }
+                    
+                    showToast("Data motor berhasil diperbarui!", "success");
                 }
-
-                motor.name = name;
-                motor.brand = brand;
-                motor.plate = plate;
-                motor.type = type;
-                motor.currentOdo = odo;
+            } else {
+                // Create new
+                const newId = generateUUID();
+                const normType = normalizeMotorType(type);
                 
-                if (setActive) {
-                    state.activeMotorcycleId = id;
-                } else if (state.activeMotorcycleId === id) {
-                    // If it was active and user unchecked it, switch to another motor
-                    const otherMotor = state.motorcycles.find(m => m.id !== id);
-                    state.activeMotorcycleId = otherMotor ? otherMotor.id : id;
+                // Build default last service mappings at 0
+                const initialLastService = {};
+                getComponentsForType(type).forEach(comp => {
+                    initialLastService[comp] = 0;
+                });
+
+                const newMotor = {
+                    id: newId,
+                    name: name,
+                    brand: brand,
+                    plate: plate,
+                    type: type,
+                    currentOdo: odo,
+                    intervals: { ...DEFAULT_INTERVALS[normType] },
+                    lastService: initialLastService
+                };
+
+                state.motorcycles.push(newMotor);
+                
+                if (setActive || !state.activeMotorcycleId) {
+                    state.activeMotorcycleId = newId;
                 }
                 
-                showToast("Data motor berhasil diperbarui!", "success");
+                showToast("Motor baru berhasil ditambahkan!", "success");
             }
-        } else {
-            // Create new
-            const newId = generateUUID();
-            const normType = normalizeMotorType(type);
-            
-            // Build default last service mappings at 0
-            const initialLastService = {};
-            getComponentsForType(type).forEach(comp => {
-                initialLastService[comp] = 0;
-            });
 
-            const newMotor = {
-                id: newId,
-                name: name,
-                brand: brand,
-                plate: plate,
-                type: type,
-                currentOdo: odo,
-                intervals: { ...DEFAULT_INTERVALS[normType] },
-                lastService: initialLastService
-            };
-
-            state.motorcycles.push(newMotor);
-            
-            if (setActive || !state.activeMotorcycleId) {
-                state.activeMotorcycleId = newId;
-            }
-            
-            showToast("Motor baru berhasil ditambahkan!", "success");
+            saveState();
+            closeModal('modal-motorcycle-form');
+            refreshAllUI();
         }
 
-        saveState();
-        closeModal('modal-motorcycle-form');
-        refreshAllUI();
+        if (id) {
+            const motor = state.motorcycles.find(m => m.id === id);
+            if (motor && motor.type !== type) {
+                showCustomConfirm("Mengubah tipe motor akan mengatur ulang interval servis komponen ke tipe baru. Lanjutkan?", () => {
+                    proceedSave();
+                });
+                return;
+            }
+        }
+
+        proceedSave();
     });
 
     // 7. Settings Form
@@ -1989,9 +2042,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-reset-intervals-default').addEventListener('click', () => {
-        if (confirm("Apakah Anda yakin ingin mengembalikan semua interval komponen motor ini ke standar pabrikan?")) {
+        showCustomConfirm("Apakah Anda yakin ingin mengembalikan semua interval komponen motor ini ke standar pabrikan?", () => {
             resetIntervalsToDefault();
-        }
+        });
     });
 
     // 7c. Custom Component Form Listener
@@ -2046,7 +2099,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Danger Zone - Factory Reset
     document.getElementById('btn-factory-reset').addEventListener('click', () => {
-        if (confirm("PERINGATAN: Semua data garasi, riwayat servis, dan pengaturan kustom akan dihapus permanen! Apakah Anda yakin ingin mereset aplikasi?")) {
+        showCustomConfirm("PERINGATAN: Semua data garasi, riwayat servis, dan pengaturan kustom akan dihapus permanen! Apakah Anda yakin ingin mereset aplikasi?", () => {
             localStorage.removeItem('motoserv_state');
             seedDemoData();
             loadState();
@@ -2054,7 +2107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast("Aplikasi berhasil di-reset pabrik!", "danger");
             // Switch to dashboard tab
             document.querySelector('.nav-item[data-tab="dashboard"]').click();
-        }
+        });
     });
 
     // 8. Close Modal Bindings
@@ -2101,22 +2154,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        if (confirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin melanjutkan?")) {
+        showCustomConfirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin melanjutkan?", () => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const content = event.target.result;
                 if (restoreBackupData(content)) {
-                    // Reset file input value so same file can be uploaded again if needed
-                    e.target.value = "";
-                    // Switch to dashboard
                     document.querySelector('.nav-item[data-tab="dashboard"]').click();
                 }
             };
             reader.readAsText(file);
-        } else {
-            // Reset file input
-            e.target.value = "";
-        }
+        });
+        e.target.value = "";
     });
 
     // Manual Text Restore Button
@@ -2126,7 +2174,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Harap masukkan teks kode cadangan terlebih dahulu!");
             return;
         }
-        if (confirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin memulihkan?")) {
+        showCustomConfirm("Peringatan: Pemulihan data akan menimpa seluruh data garasi dan riwayat saat ini. Apakah Anda yakin ingin memulihkan?", () => {
             if (restoreBackupData(text)) {
                 document.getElementById('textarea-restore-data').value = "";
                 // Collapse the details section
@@ -2135,7 +2183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to dashboard
                 document.querySelector('.nav-item[data-tab="dashboard"]').click();
             }
-        }
+        });
     });
 
     // 11. Google Drive Sync Event Listeners
